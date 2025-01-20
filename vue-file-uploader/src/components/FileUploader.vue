@@ -1,133 +1,154 @@
 <template>
-  <div class="container">
-   
-    <div class="file-input">
-      <label class="upload-btn"><i class="fas fa-upload"></i> Select .Dat File<input type="file" @change="handleFileUpload" hidden /></label>
+  <main class="container">
+    <h1>Upload and Process File</h1>
+
+    <div class="grid">
+      <div>
+        <label class="file-upload">
+          <i class="fas fa-upload"></i> Select .Dat File
+          <input type="file" @change="handleFileUpload" hidden />
+        </label>
+      </div>
     </div>
-    <textarea v-model="logContent" readonly placeholder="Logs will appear here..."></textarea>
-    <button class="button" @click="downloadLogFile">
+
+    <div class="log-area">
+      <textarea
+        v-model="logContent"
+        readonly
+        placeholder="Logs will appear here..."
+      ></textarea>
+    </div>
+
+    <button class="primary" @click="downloadLogFile">
       <i class="fas fa-download"></i> Download Log
     </button>
-  </div>
+  </main>
 </template>
 
-<script>
+
+<script lang="ts">
+import { defineComponent, ref, nextTick } from 'vue';
+import * as anuityProcessor from '../services/annuityProcessor';
+
 import ExcelJS from 'exceljs';
 
-export default {
-  data() {
-    return {
-      logs: []
-    };
-  },
-  computed: {
-    logContent() {
-      return this.logs.join('\n');
-    }
-  },
+export default defineComponent({
+  setup() {
+    const logs = ref<string[]>([]);
 
-  methods: {
+    const logContent = ref<string>('');
+    const logMessage = async (message: string) => {
+      logs.value.push(`${new Date().toISOString()}] ${message}`);
+      logContent.value = logs.value.join('\n');
 
-    async logMessage(level, message) {
-      this.logs.push(`[${new Date().toISOString()}] [${level}] ${message}`);
-      this.$nextTick(() => {
-        const textarea = document.querySelector('textarea');
+      await nextTick(() => {
+        const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
         textarea.scrollTop = textarea.scrollHeight;
       });
-      await new Promise(resolve => setTimeout(resolve, 0));  // Simulate async operation
-    },
+    };
 
-    async handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (!file) {
+    const handleFileUpload = async (event: Event) => {
+      const fileInput = event.target as HTMLInputElement;
+      if (!fileInput.files?.length) {
         alert('Please select a file');
         return;
       }
+      const file = fileInput.files[0];
+      await logMessage(' [INF] File selected: ' + file.name);
 
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const fileContent = e.target.result;
-        this.processFile(fileContent);
+        const fileContent = e.target?.result as string;
+        await processFile(fileContent);
       };
       reader.readAsText(file);
-    },
+    };
 
-    async processFile(content) {
-      await this.logMessage('INF', 'Processing file...');
-      const rows = content.split('\n');
-      const filteredRows = rows.filter(row => row.substring(0, 2) === 'AG');
+    const processFile = async (content: string) => {
+      await logMessage(' [INF] Processing file...');
 
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('FilteredData');
+      const ap = new anuityProcessor.AnnuityProcessor();
 
-      worksheet.columns = [
-        { header: 'Field1', key: 'field1' },
-        { header: 'Field2', key: 'field2' },
-        { header: 'Field3', key: 'field3' },
-        { header: 'Field4', key: 'field4' },
-        { header: 'Field5', key: 'field5' }
-      ];
+      const processResult = await ap.process(content);
 
-      filteredRows.forEach(row => {
-        worksheet.addRow({
-          field1: row.substring(0, 2),
-          field2: row.substring(2, 5),
-          field3: row.substring(5, 8),
-          field4: row.substring(8, 12),
-          field5: row.substring(12, 15),
-        });
-         this.logMessage('INF', 'Added row to worksheet ' + row.substring(2, 5));
+      processResult.messages.forEach(element => {
+        logMessage(element);  
       });
 
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'result.xlsx';
-      link.click();
-      await this.logMessage('INF', 'File processed and downloaded.');
-    },
+     
 
-    downloadLogFile() {
-      const blob = new Blob([this.logContent], { type: 'text/plain' });
+    };
+
+    const downloadLogFile = () => {
+      const blob = new Blob([logContent.value], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = 'log.txt';
       link.click();
-    }
+    };
+
+    return {
+      logContent,
+      handleFileUpload,
+      downloadLogFile
+    };
   }
-};
+});
 </script>
 
 <style scoped>
+/* Override Pico default styles if necessary */
 .container {
-  max-width: 800px;
+  max-width: 1480px;
   margin: auto;
   text-align: center;
+  padding: 2rem;
+  font-size: 1rem;
 }
-.upload-btn {
-  background-color: #007BFF;
-  color: white;
-  padding: 10px 20px;
+
+.file-upload {
+  background-color: var(--primary);
+  color: #2a1313;
+  padding: 1rem 2rem;
   border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
   cursor: pointer;
+  display: inline-block;
+  
 }
-.upload-btn:hover {
-  background-color: #0056b3;
+
+.file-upload:hover {
+  background-color: var(--primary-hover);
 }
+
+.log-area {
+  width: 100%;
+  max-width: 1080px;
+  margin: 2rem auto;
+}
+
 textarea {
   width: 100%;
-  height: 500px;
-  margin-top: 20px;
-  padding: 10px;
-  overflow-y: auto;
-  resize: none;
-  border: 1px solid #ccc;
+  height: 300px;
+  padding: 1rem;
+  font-size: 0.75rem;
   border-radius: 5px;
+  border: 1px solid var(--secondary);
+  box-shadow: var(--shadow-sm);
+  resize: none;
+}
+
+.primary {
+  padding: 1rem 2rem;
+  border: none;
+  background-color: var(--primary);
+  color: #0e0505;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.primary:hover {
+  background-color: var(--primary-hover);
 }
 </style>

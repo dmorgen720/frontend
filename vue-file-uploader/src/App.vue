@@ -6,7 +6,9 @@
 </template>
 
 <script>
+
 import FileUploader from './components/FileUploader.vue';
+import '@picocss/pico/css/pico.min.css';
 
 export default {
   components: {

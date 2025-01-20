@@ -8,5 +8,8 @@ export default defineConfig({
     },
     optimizeDeps: {
         exclude: ['fsevents']
-    }
+    },
+    build: {
+        sourcemap: true  // Ensure source maps are enabled for debugging
+      }
 });
